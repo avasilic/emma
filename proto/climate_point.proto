@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto.v3;
+
+option go_package = "github.com/avasilic/emma/gen/go/proto";
+
+message ClimatePoint {
+  string  source        = 1;
+  int64   epoch_ms      = 2;
+  double  value         = 3;
+  double  lat           = 4;
+  double  lon           = 5;
+  string  variable      = 6;
+  string  units         = 7;
+  string  resolution    = 8;
+  string  uuid          = 9;
+}

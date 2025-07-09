@@ -1,0 +1,23 @@
+kafka:
+  bootstrap_servers: "localhost:9092"
+  group_id: "climate-processor"
+  topic: "weather.raw"
+  auto_offset_reset: "earliest"
+
+processing:
+  enable_validation: true
+  enable_enrichment: true
+  enable_aggregation: false # Start simple
+  batch_size: 100
+  validation_rules:
+    temperature_min: -100.0
+    temperature_max: 100.0
+    humidity_min: 0.0
+    humidity_max: 100.0
+
+influxdb:
+  host: "localhost"
+  port: 8086
+  database: "climate"
+  username: null
+  password: null
