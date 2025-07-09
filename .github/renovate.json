@@ -1,0 +1,42 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": [
+		":dependencyDashboard",
+		":ignoreModulesAndTests",
+		":semanticPrefixFixDepsChoreOthers",
+		"group:monorepos",
+		"group:recommended",
+		"replacements:all",
+		"workarounds:all",
+		"helpers:disableTypesNodeMajor",
+		"schedule:earlyMondays"
+	],
+	"assigneesFromCodeOwners": true,
+	"automerge": true,
+	"automergeType": "pr",
+	"automergeStrategy": "squash",
+	"platformAutomerge": true,
+	"ignorePaths": [
+		"**/archive/**"
+	],
+	"packageRules": [
+		{
+			"matchUpdateTypes": [
+				"patch"
+			],
+			"groupName": "patch"
+		},
+		{
+			"matchUpdateTypes": [
+				"minor"
+			],
+			"groupName": "minor"
+		},
+		{
+			"matchDepTypes": [
+				"devDependencies"
+			],
+			"groupName": "devDependencies"
+		}
+	]
+}
