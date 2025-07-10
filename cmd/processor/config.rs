@@ -39,9 +39,9 @@ pub struct ValidationRules {
 pub struct InfluxDbConfig {
     pub host: String,
     pub port: u16,
-    pub database: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
+    pub org: String,
+    pub bucket: String,
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,7 +67,9 @@ impl ProcessorConfig {
             .set_default("processing.validation_rules.humidity_max", 100.0)?
             .set_default("influxdb.host", "localhost")?
             .set_default("influxdb.port", 8086)?
-            .set_default("influxdb.database", "climate")?
+            .set_default("influxdb.org", "emma")?
+            .set_default("influxdb.bucket", "climate")?
+            .set_default("influxdb.token", "emma-token")?
             .set_default("geocoder.geonames_file_path", "allCountries.txt")?
             // Override with environment variables
             .add_source(Environment::with_prefix("PROCESSOR").separator("_"))
