@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package proto.v1;
 
-option go_package = "emma/gen/go/proto";
+option go_package = "emma/gen/go/proto/v1";
 
 message DataPoint {
   string source = 1;

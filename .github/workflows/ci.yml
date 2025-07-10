@@ -36,10 +36,8 @@ jobs:
 
       - name: Verify protobuf files generated
         run: |
-          echo "Checking generated protobuf files..."
-          ls -la gen/go/proto/
-          echo "Content of generated Go file:"
-          head -20 gen/go/proto/climate_point.pb.go || echo "File not found"
+          echo "Verifying protobuf files were generated..."
+          ls -la gen/go/proto/v1/
 
       - name: Download dependencies
         run: go mod download
@@ -117,10 +115,8 @@ jobs:
 
       - name: Verify protobuf files generated for Rust
         run: |
-          echo "Checking generated protobuf files..."
-          ls -la gen/go/proto/
-          echo "Content of generated Go file:"
-          head -20 gen/go/proto/climate_point.pb.go || echo "File not found"
+          echo "Verifying protobuf files were generated..."
+          ls -la gen/go/proto/v1/
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
