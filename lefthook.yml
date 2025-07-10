@@ -1,0 +1,198 @@
+pre-commit:
+  parallel: true
+  commands:
+    # Go formatting check
+    go-fmt:
+      glob: "*.go"
+      run: |
+        files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v '\.pb\.go$' | tr '\n' ' ')
+        if [ -n "$files" ]; then
+          unformatted=$(gofmt -l $files)
+          if [ -n "$unformatted" ]; then
+            echo "❌ Go files need formatting:"
+            echo "$unformatted"
+            echo "Run: gofmt -w $unformatted"
+            exit 1
+          fi
+          echo "✅ Go formatting check passed"
+        fi
+
+    # Go linting
+    go-lint:
+      glob: "*.go"
+      run: |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          golangci-lint run --new-from-rev=HEAD~1
+          echo "✅ Go linting passed"
+        else
+          echo "⚠️  golangci-lint not found, skipping Go linting"
+          echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        fi
+
+    # Go tests for changed packages
+    go-test:
+      glob: "*.go"
+      run: |
+        packages=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v '\.pb\.go$' | xargs -I {} dirname {} | sort -u | tr '\n' ' ')
+        if [ -n "$packages" ]; then
+          echo "🧪 Running Go tests for changed packages..."
+          go test -race $packages
+          echo "✅ Go tests passed"
+        fi
+
+    # Rust formatting check
+    rust-fmt:
+      glob: "cmd/processor/**/*.rs"
+      run: |
+        if [ -f "cmd/processor/Cargo.toml" ]; then
+          cd cmd/processor
+          if ! cargo fmt --all -- --check; then
+            echo "❌ Rust files need formatting"
+            echo "Run: cd cmd/processor && cargo fmt --all"
+            exit 1
+          fi
+          echo "✅ Rust formatting check passed"
+        fi
+
+    # Rust linting
+    rust-clippy:
+      glob: "cmd/processor/**/*.rs"
+      run: |
+        if [ -f "cmd/processor/Cargo.toml" ]; then
+          cd cmd/processor
+          cargo clippy --all-targets --all-features -- -D warnings
+          echo "✅ Rust clippy passed"
+        fi
+
+    # Rust tests
+    rust-test:
+      glob: "cmd/processor/**/*.rs"
+      run: |
+        if [ -f "cmd/processor/Cargo.toml" ]; then
+          cd cmd/processor
+          echo "🧪 Running Rust tests..."
+          cargo test --quiet
+          echo "✅ Rust tests passed"
+        fi
+
+    # Protobuf linting
+    proto-lint:
+      glob: "proto/**/*.proto"
+      run: |
+        if command -v buf >/dev/null 2>&1; then
+          buf lint
+          echo "✅ Protobuf linting passed"
+        else
+          echo "⚠️  buf not found, skipping protobuf linting"
+          echo "Install from: https://docs.buf.build/installation"
+        fi
+
+    # Protobuf generation check
+    proto-generate:
+      glob: "proto/**/*.proto"
+      run: |
+        if command -v buf >/dev/null 2>&1; then
+          buf generate
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "❌ Generated protobuf files are not up to date"
+            echo "Automatically generated files. Please review and commit:"
+            git diff --name-only
+            git add gen/
+            echo "✅ Protobuf files regenerated and staged"
+          else
+            echo "✅ Protobuf files are up to date"
+          fi
+        fi
+
+    # Docker Compose validation
+    docker-compose-validate:
+      glob: "docker-compose.yml"
+      run: |
+        if command -v docker-compose >/dev/null 2>&1; then
+          docker-compose config >/dev/null
+          echo "✅ Docker Compose validation passed"
+        else
+          echo "⚠️  docker-compose not found, skipping validation"
+        fi
+
+    # Check for secrets/sensitive data
+    secrets-check:
+      glob: "*"
+      run: |
+        files=$(git diff --cached --name-only --diff-filter=ACM)
+        if [ -n "$files" ]; then
+          # Check for common secret patterns
+          secrets_found=""
+          for file in $files; do
+            # Skip binary files and generated files
+            if file "$file" | grep -q "text" && ! echo "$file" | grep -qE '\.(pb\.go|lock)$'; then
+              # Check for API keys, passwords, tokens
+              if grep -HnE "(api[_-]?key|password|secret|token|private[_-]?key)" "$file" | grep -vE "(placeholder|example|test|mock|fake|dummy|YOUR_)" >/dev/null; then
+                secrets_found="$secrets_found\n$file"
+              fi
+            fi
+          done
+          
+          if [ -n "$secrets_found" ]; then
+            echo "⚠️  Potential secrets detected in:"
+            echo "$secrets_found"
+            echo "Please review these files and ensure no real secrets are committed."
+            echo "Use environment variables or secret management instead."
+            # Don't fail the commit, just warn
+          else
+            echo "✅ No obvious secrets detected"
+          fi
+        fi
+
+pre-push:
+  parallel: true
+  commands:
+    # Full test suite before push
+    go-test-all:
+      run: |
+        echo "🧪 Running full Go test suite..."
+        go test -race ./...
+        echo "✅ All Go tests passed"
+
+    rust-test-all:
+      run: |
+        if [ -f "cmd/processor/Cargo.toml" ]; then
+          cd cmd/processor
+          echo "🧪 Running full Rust test suite..."
+          cargo test
+          echo "✅ All Rust tests passed"
+        fi
+
+    # Security audit
+    rust-audit:
+      run: |
+        if [ -f "cmd/processor/Cargo.toml" ]; then
+          cd cmd/processor
+          if command -v cargo-audit >/dev/null 2>&1; then
+            cargo audit
+            echo "✅ Rust security audit passed"
+          else
+            echo "⚠️  cargo-audit not found, install with: cargo install cargo-audit"
+          fi
+        fi
+
+    # Check Go mod
+    go-mod-tidy:
+      run: |
+        go mod tidy
+        if [ -n "$(git diff go.mod go.sum)" ]; then
+          echo "❌ go.mod or go.sum needs to be updated"
+          echo "Run: go mod tidy"
+          exit 1
+        fi
+        echo "✅ Go modules are tidy"
+
+# Skip hooks for specific scenarios
+skip_output:
+  - meta
+  - summary
+
+# Output configuration
+output:
+  - executions
+  - summary

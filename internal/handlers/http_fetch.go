@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"emma/gen/go/proto"
+	"emma/gen/go/proto/v1"
 
 	"github.com/tidwall/gjson"
 )
@@ -32,7 +32,7 @@ func (h *HTTPFetcher) Validate(config map[string]interface{}) error {
 	return nil
 }
 
-func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*proto.DataPoint, error) {
+func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, error) {
 	url := config["url"].(string)
 	method := h.getStringConfig(config, "method", "GET")
 
@@ -96,8 +96,8 @@ func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*proto.DataPoint, 
 	return h.extractDataPoints(string(jsonBytes), config)
 }
 
-func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]interface{}) ([]*proto.DataPoint, error) {
-	var points []*proto.DataPoint
+func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]interface{}) ([]*v1.DataPoint, error) {
+	var points []*v1.DataPoint
 
 	// Get the configuration
 	source := h.getStringConfig(config, "source", "unknown")
@@ -131,7 +131,7 @@ func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]inter
 	return points, nil
 }
 
-func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]interface{}, source, category string) (*proto.DataPoint, error) {
+func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]interface{}, source, category string) (*v1.DataPoint, error) {
 	// Get the response path
 	responsePath := h.getStringConfig(config, "response_path", "")
 	if responsePath == "" {
@@ -167,7 +167,7 @@ func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]
 	stationId := h.getStringConfig(config, "station_id", "")
 	uuid := h.generateUUID(source, variable, stationId)
 
-	point := &proto.DataPoint{
+	point := &v1.DataPoint{
 		Source:     source,
 		EpochMs:    time.Now().UnixMilli(),
 		Value:      value,

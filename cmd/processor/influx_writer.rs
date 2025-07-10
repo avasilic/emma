@@ -58,7 +58,7 @@ impl InfluxWriter {
                 DateTime::from_timestamp_millis(point.epoch_ms).unwrap_or_else(|| Utc::now());
 
             // Create the main data point
-            let write_query = WriteQuery::new(timestamp.into(), "data_points")
+            let mut write_query = WriteQuery::new(timestamp.into(), "data_points")
                 .add_tag("source", point.source.as_str())
                 .add_tag("category", point.category.as_str())
                 .add_tag("variable", point.variable.as_str())
@@ -69,11 +69,64 @@ impl InfluxWriter {
                 .add_field("lat", point.lat)
                 .add_field("lon", point.lon);
 
+            // Add H3 cell information if available
+            if let Some(h3_cells) = &enriched.h3_cells {
+                for (resolution, &cell_id) in h3_cells.iter().enumerate() {
+                    write_query = write_query
+                        .add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                }
+            }
+
+            // Add other enriched fields
+            if let Some(nearest_place) = &enriched.nearest_place {
+                write_query = write_query.add_tag("nearest_place", nearest_place.as_str());
+            }
+
+            if let Some(timezone) = &enriched.timezone {
+                write_query = write_query.add_tag("timezone", timezone.as_str());
+            }
+
+            if let Some(resolution_used) = enriched.resolution_used {
+                write_query = write_query.add_field("h3_resolution_used", resolution_used as i64);
+            }
+
             write_queries.push(write_query);
+
+            // Write H3 spatial data as a dedicated measurement for efficient spatial queries
+            if let Some(h3_cells) = &enriched.h3_cells {
+                let mut h3_query = WriteQuery::new(timestamp.into(), "h3_spatial")
+                    .add_tag("source", point.source.as_str())
+                    .add_tag("category", point.category.as_str())
+                    .add_tag("variable", point.variable.as_str())
+                    .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
+                    .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
+                    .add_field("lat", point.lat)
+                    .add_field("lon", point.lon);
+
+                // Add all H3 cell IDs as fields for efficient spatial queries
+                for (resolution, &cell_id) in h3_cells.iter().enumerate() {
+                    h3_query =
+                        h3_query.add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                }
+
+                if let Some(nearest_place) = &enriched.nearest_place {
+                    h3_query = h3_query.add_tag("nearest_place", nearest_place.as_str());
+                }
+
+                if let Some(timezone) = &enriched.timezone {
+                    h3_query = h3_query.add_tag("timezone", timezone.as_str());
+                }
+
+                if let Some(resolution_used) = enriched.resolution_used {
+                    h3_query = h3_query.add_field("h3_resolution_used", resolution_used as i64);
+                }
+
+                write_queries.push(h3_query);
+            }
 
             // Write calculated fields as separate measurements
             for (field_name, field_value) in &enriched.calculated_fields {
-                let calculated_query = WriteQuery::new(timestamp.into(), "calculated_fields")
+                let mut calculated_query = WriteQuery::new(timestamp.into(), "calculated_fields")
                     .add_tag("source", point.source.as_str())
                     .add_tag("category", point.category.as_str())
                     .add_tag("variable", field_name.as_str())
@@ -88,6 +141,29 @@ impl InfluxWriter {
                     .add_field("value", *field_value)
                     .add_field("lat", point.lat)
                     .add_field("lon", point.lon);
+
+                // Add H3 cell information to calculated fields too
+                if let Some(h3_cells) = &enriched.h3_cells {
+                    for (resolution, &cell_id) in h3_cells.iter().enumerate() {
+                        calculated_query = calculated_query
+                            .add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                    }
+                }
+
+                // Add other enriched fields
+                if let Some(nearest_place) = &enriched.nearest_place {
+                    calculated_query =
+                        calculated_query.add_tag("nearest_place", nearest_place.as_str());
+                }
+
+                if let Some(timezone) = &enriched.timezone {
+                    calculated_query = calculated_query.add_tag("timezone", timezone.as_str());
+                }
+
+                if let Some(resolution_used) = enriched.resolution_used {
+                    calculated_query =
+                        calculated_query.add_field("h3_resolution_used", resolution_used as i64);
+                }
 
                 write_queries.push(calculated_query);
             }

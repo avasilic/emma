@@ -8,7 +8,7 @@ import (
 	"log"
 	"time"
 
-	"emma/gen/go/proto"
+	"emma/gen/go/proto/v1"
 	"github.com/segmentio/kafka-go"
 	protobuf "google.golang.org/protobuf/proto"
 )
@@ -42,7 +42,7 @@ func NewProducer(config ProducerConfig) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) PublishPoints(points []*proto.DataPoint) error {
+func (p *Producer) PublishPoints(points []*v1.DataPoint) error {
 	if len(points) == 0 {
 		return nil
 	}
@@ -85,8 +85,8 @@ func (p *Producer) PublishPoints(points []*proto.DataPoint) error {
 	return nil
 }
 
-func (p *Producer) PublishPoint(point *proto.DataPoint) error {
-	return p.PublishPoints([]*proto.DataPoint{point})
+func (p *Producer) PublishPoint(point *v1.DataPoint) error {
+	return p.PublishPoints([]*v1.DataPoint{point})
 }
 
 func (p *Producer) Close() error {

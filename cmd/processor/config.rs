@@ -7,6 +7,7 @@ pub struct ProcessorConfig {
     pub kafka: KafkaConfig,
     pub processing: ProcessingConfig,
     pub influxdb: InfluxDbConfig,
+    pub geocoder: GeocoderConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -43,6 +44,11 @@ pub struct InfluxDbConfig {
     pub password: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GeocoderConfig {
+    pub geonames_file_path: String,
+}
+
 impl ProcessorConfig {
     pub fn load() -> Result<Self, ConfigError> {
         let config = Config::builder()
@@ -62,6 +68,7 @@ impl ProcessorConfig {
             .set_default("influxdb.host", "localhost")?
             .set_default("influxdb.port", 8086)?
             .set_default("influxdb.database", "climate")?
+            .set_default("geocoder.geonames_file_path", "allCountries.txt")?
             // Override with environment variables
             .add_source(Environment::with_prefix("PROCESSOR").separator("_"))
             .build()?;

@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
 use crate::config::ProcessingConfig;
+use crate::geo::H3Geocoder;
 use crate::proto::DataPoint;
 
 pub struct DataProcessor {
     config: ProcessingConfig,
+    geocoder: H3Geocoder,
 }
 
 #[derive(Debug, Clone)]
@@ -20,13 +22,17 @@ pub struct EnrichedData {
     pub country: Option<String>,
     pub region: Option<String>,
     pub timezone: Option<String>,
+    pub nearest_place: Option<String>,
+    pub h3_cells: Option<[u64; 9]>, // H3 cell IDs for resolutions 0-8
+    pub resolution_used: Option<u8>,
     pub calculated_fields: HashMap<String, f64>,
 }
 
 impl DataProcessor {
-    pub fn new(config: &ProcessingConfig) -> Self {
+    pub fn new(config: &ProcessingConfig, geocoder: H3Geocoder) -> Self {
         DataProcessor {
             config: config.clone(),
+            geocoder,
         }
     }
 
@@ -273,10 +279,18 @@ impl DataProcessor {
         let mut enriched = EnrichedData::default();
         let mut calculated_fields = HashMap::new();
 
-        // Reverse geocoding (simplified - in real app you'd use a geocoding API)
-        enriched.country = self.get_country_from_coords(point.lat, point.lon);
-        enriched.region = self.get_region_from_coords(point.lat, point.lon);
-        enriched.timezone = self.get_timezone_from_coords(point.lat, point.lon);
+        // Reverse geocoding using H3Geocoder
+        if let Some(location) = self
+            .geocoder
+            .get_complete_location_info(point.lat, point.lon)
+        {
+            enriched.country = Some(location.country);
+            enriched.region = Some(location.region);
+            enriched.timezone = Some(location.timezone);
+            enriched.nearest_place = Some(location.nearest_place);
+            enriched.h3_cells = Some(location.h3_cells);
+            enriched.resolution_used = Some(location.resolution_used);
+        }
 
         // Add calculated fields based on category and variable type
         match point.category.as_str() {
@@ -308,20 +322,8 @@ impl DataProcessor {
         calculated_fields: &mut HashMap<String, f64>,
     ) {
         match point.variable.as_str() {
-            "temperature" => {
-                // Convert Celsius to Fahrenheit
-                let fahrenheit = (point.value * 9.0 / 5.0) + 32.0;
-                calculated_fields.insert("temperature_fahrenheit".to_string(), fahrenheit);
-
-                // Convert to Kelvin
-                let kelvin = point.value + 273.15;
-                calculated_fields.insert("temperature_kelvin".to_string(), kelvin);
-            }
-            "humidity" => {
-                // Calculate dew point (simplified formula)
-                let dew_point = point.value - ((100.0 - point.value) / 5.0);
-                calculated_fields.insert("dew_point".to_string(), dew_point);
-            }
+            "temperature" => {}
+            "humidity" => {}
             _ => {}
         }
     }
@@ -331,20 +333,6 @@ impl DataProcessor {
         point: &DataPoint,
         calculated_fields: &mut HashMap<String, f64>,
     ) {
-        match point.variable.as_str() {
-            "heart_rate" => {
-                // Calculate heart rate zones (simplified)
-                let max_hr = 220.0 - 30.0; // Assuming age 30 for example
-                let hr_percentage = (point.value / max_hr) * 100.0;
-                calculated_fields.insert("heart_rate_percentage".to_string(), hr_percentage);
-            }
-            "temperature" => {
-                // Convert body temperature to Fahrenheit
-                let fahrenheit = (point.value * 9.0 / 5.0) + 32.0;
-                calculated_fields.insert("body_temperature_fahrenheit".to_string(), fahrenheit);
-            }
-            _ => {}
-        }
     }
 
     fn add_infrastructure_calculations(
@@ -352,20 +340,6 @@ impl DataProcessor {
         point: &DataPoint,
         calculated_fields: &mut HashMap<String, f64>,
     ) {
-        match point.variable.as_str() {
-            "flow_rate" => {
-                // Convert flow rate units (example: L/s to m³/h)
-                let cubic_meters_per_hour = point.value * 3.6 / 1000.0;
-                calculated_fields
-                    .insert("flow_rate_m3_per_hour".to_string(), cubic_meters_per_hour);
-            }
-            "pressure" => {
-                // Convert pressure units (example: bar to PSI)
-                let psi = point.value * 14.5038;
-                calculated_fields.insert("pressure_psi".to_string(), psi);
-            }
-            _ => {}
-        }
     }
 
     fn add_economic_calculations(
@@ -373,14 +347,6 @@ impl DataProcessor {
         point: &DataPoint,
         calculated_fields: &mut HashMap<String, f64>,
     ) {
-        match point.variable.as_str() {
-            "price" => {
-                // Calculate price per unit (example calculation)
-                let price_per_unit = point.value / 1.0; // Placeholder
-                calculated_fields.insert("price_per_unit".to_string(), price_per_unit);
-            }
-            _ => {}
-        }
     }
 
     fn add_social_calculations(
@@ -388,14 +354,6 @@ impl DataProcessor {
         point: &DataPoint,
         calculated_fields: &mut HashMap<String, f64>,
     ) {
-        match point.variable.as_str() {
-            "population" => {
-                // Calculate population density (would need area data in real implementation)
-                let density = point.value / 1000.0; // Placeholder calculation
-                calculated_fields.insert("population_density".to_string(), density);
-            }
-            _ => {}
-        }
     }
 
     fn aggregate_point(
@@ -407,33 +365,5 @@ impl DataProcessor {
         // In a real implementation, you'd accumulate points and create hourly/daily aggregates
         debug!("📊 Aggregating point (placeholder)");
         Ok(vec![point.clone()])
-    }
-
-    // Helper methods for geocoding (simplified)
-    fn get_country_from_coords(&self, lat: f64, lon: f64) -> Option<String> {
-        // Simplified geocoding - in real app use a proper geocoding service
-        if lat > 35.0 && lat < 46.0 && lon > 138.0 && lon < 146.0 {
-            Some("Japan".to_string())
-        } else if lat > 40.0 && lat < 50.0 && lon > -125.0 && lon < -66.0 {
-            Some("United States".to_string())
-        } else {
-            None
-        }
-    }
-
-    fn get_region_from_coords(&self, lat: f64, lon: f64) -> Option<String> {
-        if lat > 35.0 && lat < 36.0 && lon > 139.0 && lon < 140.0 {
-            Some("Tokyo".to_string())
-        } else {
-            None
-        }
-    }
-
-    fn get_timezone_from_coords(&self, lat: f64, lon: f64) -> Option<String> {
-        if lat > 35.0 && lat < 46.0 && lon > 138.0 && lon < 146.0 {
-            Some("Asia/Tokyo".to_string())
-        } else {
-            None
-        }
     }
 }
