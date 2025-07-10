@@ -3,5 +3,3 @@ plugins:
   - name: go
     out: gen/go
     opt: paths=source_relative
-  - name: prost
-    out: gen/rust

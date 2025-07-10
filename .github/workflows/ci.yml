@@ -23,6 +23,14 @@ jobs:
           go-version: "1.24"
           cache: true
 
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate protobuf files
+        run: buf generate
+
       - name: Download dependencies
         run: go mod download
 
@@ -66,9 +74,6 @@ jobs:
   rust-checks:
     name: Rust Checks
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./cmd/processor
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,6 +83,19 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate protobuf files
+        run: buf generate
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -85,20 +103,25 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+        working-directory: ./cmd/processor
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: ./cmd/processor
 
       - name: Run tests
         run: cargo test --verbose
+        working-directory: ./cmd/processor
 
       - name: Build processor
         run: cargo build --verbose --release
+        working-directory: ./cmd/processor
 
       - name: Check for security vulnerabilities
         run: |
           cargo install cargo-audit
           cargo audit
+        working-directory: ./cmd/processor
 
   protobuf-checks:
     name: Protobuf Checks
@@ -140,15 +163,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate docker-compose
-        run: docker-compose config
+        run: docker compose config
 
       - name: Check if docker-compose services start
         run: |
-          docker-compose up -d kafka influxdb
+          docker compose up -d kafka influxdb
           sleep 30
-          docker-compose ps
-          docker-compose logs
-          docker-compose down
+          docker compose ps
+          docker compose logs
+          docker compose down
 
   security-checks:
     name: Security Checks
