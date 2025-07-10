@@ -9,6 +9,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   setup:
     name: Setup
