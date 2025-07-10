@@ -73,8 +73,8 @@ impl InfluxWriter {
             // Add H3 cell information if available
             if let Some(h3_cells) = &enriched.h3_cells {
                 for (resolution, &cell_id) in h3_cells.iter().enumerate() {
-                    write_query = write_query
-                        .add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
+                    write_query =
+                        write_query.add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                 }
             }
 

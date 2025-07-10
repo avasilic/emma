@@ -315,36 +315,41 @@ impl DataProcessor {
         enriched.calculated_fields = calculated_fields;
         Ok(enriched)
     }
-    
+
     fn add_environmental_calculations(
         &self,
         _point: &DataPoint,
         _calculated_fields: &mut HashMap<String, f64>,
-    ) {}
+    ) {
+    }
 
     fn add_health_calculations(
         &self,
         _point: &DataPoint,
         _calculated_fields: &mut HashMap<String, f64>,
-    ) {}
+    ) {
+    }
 
     fn add_infrastructure_calculations(
         &self,
         _point: &DataPoint,
         _calculated_fields: &mut HashMap<String, f64>,
-    ) {}
+    ) {
+    }
 
     fn add_economic_calculations(
         &self,
         _point: &DataPoint,
         _calculated_fields: &mut HashMap<String, f64>,
-    ) {}
+    ) {
+    }
 
     fn add_social_calculations(
         &self,
         _point: &DataPoint,
         _calculated_fields: &mut HashMap<String, f64>,
-    ) {}
+    ) {
+    }
 
     fn aggregate_point(
         &self,
