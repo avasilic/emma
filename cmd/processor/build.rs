@@ -1,7 +1,7 @@
 use std::io::Result;
 
 fn main() -> Result<()> {
-    let proto_file = "../../proto/climate_point.proto";
+    let proto_file = "../../proto/v1/climate_point.proto";
     let proto_dir = "../../proto";
 
     // Tell Cargo to rerun this build script if the proto file changes
