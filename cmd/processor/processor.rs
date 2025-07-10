@@ -333,7 +333,6 @@ impl DataProcessor {
         point: &DataPoint,
         calculated_fields: &mut HashMap<String, f64>,
     ) {
-        
     }
 
     fn add_infrastructure_calculations(

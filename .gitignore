@@ -122,3 +122,6 @@ ca-certificates/
 influx_dump_*.sql
 
 .DS_Store
+
+# Lefthook local configuration
+.lefthook-local.yml
