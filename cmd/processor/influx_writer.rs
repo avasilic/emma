@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
-use influxdb::{Client, WriteQuery};
+use futures::stream;
+use influxdb2::models::DataPoint;
+use influxdb2::Client;
 use tracing::{debug, error, info};
 
 use crate::config::InfluxDbConfig;
@@ -8,36 +9,21 @@ use crate::processor::ProcessedPoint;
 
 pub struct InfluxWriter {
     client: Client,
-    #[allow(dead_code)]
-    database: String,
+    bucket: String,
 }
 
 impl InfluxWriter {
     pub async fn new(config: &InfluxDbConfig) -> Result<Self> {
         let url = format!("http://{}:{}", config.host, config.port);
 
-        let mut client = Client::new(&url, &config.database);
+        let client = Client::new(&url, &config.org, &config.token);
 
-        // Add authentication if provided
-        if let (Some(username), Some(password)) = (&config.username, &config.password) {
-            client = client.with_auth(username, password);
-        }
-
-        // Test the connection
-        let ping_result = client.ping().await;
-        match ping_result {
-            Ok(_) => {
-                info!("🔗 Connected to InfluxDB at {}", url);
-            }
-            Err(e) => {
-                error!("❌ Failed to connect to InfluxDB: {}", e);
-                return Err(anyhow!("Failed to connect to InfluxDB: {}", e));
-            }
-        }
+        // Note: Connection will be tested on first write attempt
+        info!("🔗 InfluxDB client configured for {}", url);
 
         Ok(InfluxWriter {
             client,
-            database: config.database.clone(),
+            bucket: config.bucket.clone(),
         })
     }
 
@@ -48,143 +34,142 @@ impl InfluxWriter {
 
         debug!("📝 Writing {} points to InfluxDB", points.len());
 
-        let mut write_queries = Vec::new();
+        let mut data_points = Vec::new();
 
         for processed_point in &points {
             let point = &processed_point.data_point;
             let enriched = &processed_point.enriched_data;
 
-            // Convert epoch milliseconds to DateTime
-            let timestamp =
-                DateTime::from_timestamp_millis(point.epoch_ms).unwrap_or_else(Utc::now);
+            // Convert epoch milliseconds to timestamp
+            let timestamp = point.epoch_ms * 1_000_000; // Convert to nanoseconds
 
             // Create the main data point
-            let mut write_query = WriteQuery::new(timestamp.into(), "data_points")
-                .add_tag("source", point.source.as_str())
-                .add_tag("category", point.category.as_str())
-                .add_tag("variable", point.variable.as_str())
-                .add_tag("units", point.units.as_str())
-                .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
-                .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
-                .add_field("value", point.value)
-                .add_field("lat", point.lat)
-                .add_field("lon", point.lon);
+            let mut builder = DataPoint::builder("data_points")
+                .tag("source", &point.source)
+                .tag("category", &point.category)
+                .tag("variable", &point.variable)
+                .tag("units", &point.units)
+                .tag("country", enriched.country.as_deref().unwrap_or("unknown"))
+                .tag("region", enriched.region.as_deref().unwrap_or("unknown"))
+                .field("value", point.value)
+                .field("lat", point.lat)
+                .field("lon", point.lon)
+                .timestamp(timestamp);
 
             // Add H3 cell information if available
             if let Some(h3_cells) = &enriched.h3_cells {
                 for (resolution, &cell_id) in h3_cells.iter().enumerate() {
-                    write_query =
-                        write_query.add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
+                    builder = builder.field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                 }
             }
 
             // Add other enriched fields
             if let Some(nearest_place) = &enriched.nearest_place {
-                write_query = write_query.add_tag("nearest_place", nearest_place.as_str());
+                builder = builder.tag("nearest_place", nearest_place);
             }
 
             if let Some(timezone) = &enriched.timezone {
-                write_query = write_query.add_tag("timezone", timezone.as_str());
+                builder = builder.tag("timezone", timezone);
             }
 
             if let Some(resolution_used) = enriched.resolution_used {
-                write_query = write_query.add_field("h3_resolution_used", resolution_used as i64);
+                builder = builder.field("h3_resolution_used", resolution_used as i64);
             }
 
-            write_queries.push(write_query);
+            data_points.push(builder.build()?);
 
             // Write H3 spatial data as a dedicated measurement for efficient spatial queries
             if let Some(h3_cells) = &enriched.h3_cells {
-                let mut h3_query = WriteQuery::new(timestamp.into(), "h3_spatial")
-                    .add_tag("source", point.source.as_str())
-                    .add_tag("category", point.category.as_str())
-                    .add_tag("variable", point.variable.as_str())
-                    .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
-                    .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
-                    .add_field("lat", point.lat)
-                    .add_field("lon", point.lon);
+                let mut h3_builder = DataPoint::builder("h3_spatial")
+                    .tag("source", &point.source)
+                    .tag("category", &point.category)
+                    .tag("variable", &point.variable)
+                    .tag("country", enriched.country.as_deref().unwrap_or("unknown"))
+                    .tag("region", enriched.region.as_deref().unwrap_or("unknown"))
+                    .field("lat", point.lat)
+                    .field("lon", point.lon)
+                    .timestamp(timestamp);
 
                 // Add all H3 cell IDs as fields for efficient spatial queries
                 for (resolution, &cell_id) in h3_cells.iter().enumerate() {
-                    h3_query =
-                        h3_query.add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
+                    h3_builder =
+                        h3_builder.field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                 }
 
                 if let Some(nearest_place) = &enriched.nearest_place {
-                    h3_query = h3_query.add_tag("nearest_place", nearest_place.as_str());
+                    h3_builder = h3_builder.tag("nearest_place", nearest_place);
                 }
 
                 if let Some(timezone) = &enriched.timezone {
-                    h3_query = h3_query.add_tag("timezone", timezone.as_str());
+                    h3_builder = h3_builder.tag("timezone", timezone);
                 }
 
                 if let Some(resolution_used) = enriched.resolution_used {
-                    h3_query = h3_query.add_field("h3_resolution_used", resolution_used as i64);
+                    h3_builder = h3_builder.field("h3_resolution_used", resolution_used as i64);
                 }
 
-                write_queries.push(h3_query);
+                data_points.push(h3_builder.build()?);
             }
 
             // Write calculated fields as separate measurements
             for (field_name, field_value) in &enriched.calculated_fields {
-                let mut calculated_query = WriteQuery::new(timestamp.into(), "calculated_fields")
-                    .add_tag("source", point.source.as_str())
-                    .add_tag("category", point.category.as_str())
-                    .add_tag("variable", field_name.as_str())
-                    .add_tag("original_variable", point.variable.as_str())
-                    .add_tag(
+                let mut calculated_builder = DataPoint::builder("calculated_fields")
+                    .tag("source", &point.source)
+                    .tag("category", &point.category)
+                    .tag("variable", field_name)
+                    .tag("original_variable", &point.variable)
+                    .tag(
                         "units",
-                        self.get_units_for_calculated_field(field_name, &point.category)
-                            .as_str(),
+                        self.get_units_for_calculated_field(field_name, &point.category),
                     )
-                    .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
-                    .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
-                    .add_field("value", *field_value)
-                    .add_field("lat", point.lat)
-                    .add_field("lon", point.lon);
+                    .tag("country", enriched.country.as_deref().unwrap_or("unknown"))
+                    .tag("region", enriched.region.as_deref().unwrap_or("unknown"))
+                    .field("value", *field_value)
+                    .field("lat", point.lat)
+                    .field("lon", point.lon)
+                    .timestamp(timestamp);
 
                 // Add H3 cell information to calculated fields too
                 if let Some(h3_cells) = &enriched.h3_cells {
                     for (resolution, &cell_id) in h3_cells.iter().enumerate() {
-                        calculated_query = calculated_query
-                            .add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
+                        calculated_builder = calculated_builder
+                            .field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                     }
                 }
 
                 // Add other enriched fields
                 if let Some(nearest_place) = &enriched.nearest_place {
-                    calculated_query =
-                        calculated_query.add_tag("nearest_place", nearest_place.as_str());
+                    calculated_builder = calculated_builder.tag("nearest_place", nearest_place);
                 }
 
                 if let Some(timezone) = &enriched.timezone {
-                    calculated_query = calculated_query.add_tag("timezone", timezone.as_str());
+                    calculated_builder = calculated_builder.tag("timezone", timezone);
                 }
 
                 if let Some(resolution_used) = enriched.resolution_used {
-                    calculated_query =
-                        calculated_query.add_field("h3_resolution_used", resolution_used as i64);
+                    calculated_builder =
+                        calculated_builder.field("h3_resolution_used", resolution_used as i64);
                 }
 
-                write_queries.push(calculated_query);
+                data_points.push(calculated_builder.build()?);
             }
         }
 
-        // Execute all write queries
-        for write_query in write_queries {
-            match self.client.query(write_query).await {
-                Ok(_) => {
-                    debug!("✅ Successfully wrote point to InfluxDB");
-                }
-                Err(e) => {
-                    error!("❌ Failed to write point to InfluxDB: {}", e);
-                    return Err(anyhow!("Failed to write to InfluxDB: {}", e));
-                }
+        // Write all points at once
+        match self
+            .client
+            .write(&self.bucket, stream::iter(data_points))
+            .await
+        {
+            Ok(_) => {
+                info!("✅ Successfully wrote {} points to InfluxDB", points.len());
+                Ok(())
+            }
+            Err(e) => {
+                error!("❌ Failed to write points to InfluxDB: {}", e);
+                Err(anyhow!("Failed to write to InfluxDB: {}", e))
             }
         }
-
-        info!("✅ Successfully wrote {} points to InfluxDB", points.len());
-        Ok(())
     }
 
     fn get_units_for_calculated_field(&self, field_name: &str, category: &str) -> String {
