@@ -5,6 +5,6 @@ import (
 )
 
 type Handler interface {
-	Fetch(config map[string]interface{}) ([]*proto.ClimatePoint, error)
+	Fetch(config map[string]interface{}) ([]*proto.DataPoint, error)
 	Validate(config map[string]interface{}) error
 }

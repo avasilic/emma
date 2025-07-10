@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
-    info!("🦀 Starting Climate Data Processor...");
+    info!("🦀 Starting Data Processor...");
 
     // Load configuration
     let config = ProcessorConfig::load()?;
@@ -39,9 +39,9 @@ async fn main() -> Result<()> {
     // Main processing loop
     while let Some(message) = message_stream.next().await {
         match message {
-            Ok(climate_point) => {
+            Ok(data_point) => {
                 // Process the data point
-                match processor.process(climate_point).await {
+                match processor.process(data_point).await {
                     Ok(processed_points) => {
                         // Write to InfluxDB
                         if let Err(e) = influx_writer.write_points(processed_points).await {

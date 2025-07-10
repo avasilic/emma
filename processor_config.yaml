@@ -1,7 +1,7 @@
 kafka:
   bootstrap_servers: "localhost:9092"
-  group_id: "climate-processor"
-  topic: "weather.raw"
+  group_id: "data-processor"
+  topic: "data.raw"
   auto_offset_reset: "earliest"
 
 processing:

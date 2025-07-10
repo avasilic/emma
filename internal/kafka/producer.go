@@ -42,7 +42,7 @@ func NewProducer(config ProducerConfig) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) PublishPoints(points []*proto.ClimatePoint) error {
+func (p *Producer) PublishPoints(points []*proto.DataPoint) error {
 	if len(points) == 0 {
 		return nil
 	}
@@ -67,6 +67,7 @@ func (p *Producer) PublishPoints(points []*proto.ClimatePoint) error {
 			Headers: []kafka.Header{
 				{Key: "source", Value: []byte(point.Source)},
 				{Key: "variable", Value: []byte(point.Variable)},
+				{Key: "category", Value: []byte(point.Category)},
 				{Key: "format", Value: []byte("protobuf")},
 			},
 		}
@@ -84,8 +85,8 @@ func (p *Producer) PublishPoints(points []*proto.ClimatePoint) error {
 	return nil
 }
 
-func (p *Producer) PublishPoint(point *proto.ClimatePoint) error {
-	return p.PublishPoints([]*proto.ClimatePoint{point})
+func (p *Producer) PublishPoint(point *proto.DataPoint) error {
+	return p.PublishPoints([]*proto.DataPoint{point})
 }
 
 func (p *Producer) Close() error {

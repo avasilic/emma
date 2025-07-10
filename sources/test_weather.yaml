@@ -1,5 +1,6 @@
 name: "test_weather_data"
 type: "http_fetch"
+category: "environmental"
 frequency: "15s"
 config:
   url: "https://httpbin.org/json"

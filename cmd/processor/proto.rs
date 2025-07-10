@@ -6,4 +6,4 @@ pub mod proto_v3 {
 }
 
 // Re-export for convenience
-pub use proto_v3::ClimatePoint;
+pub use proto_v3::DataPoint;

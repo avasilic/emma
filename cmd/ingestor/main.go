@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	log.Println("Starting Climate Data Ingestor...")
+	log.Println("Starting Data Ingestor...")
 
 	// Load source configurations
 	sources, err := config.LoadSourceConfigs("./sources/")
@@ -51,7 +51,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("✅ Climate Data Ingestor started successfully")
+	log.Println("✅ Data Ingestor started successfully")
 	log.Println("Press Ctrl+C to stop...")
 
 	<-sigChan
@@ -59,7 +59,7 @@ func main() {
 }
 
 func startWorker(source config.SourceConfig, producer *kafka.Producer) {
-	log.Printf("Starting worker for source: %s (type: %s)", source.Name, source.Type)
+	log.Printf("Starting worker for source: %s (type: %s, category: %s)", source.Name, source.Type, source.Category)
 
 	// Get handler for this source type
 	handler, err := handlers.GetHandler(source.Type)
@@ -81,16 +81,24 @@ func startWorker(source config.SourceConfig, producer *kafka.Producer) {
 		return
 	}
 
+	// Add category to config for handler
+	sourceConfig := make(map[string]interface{})
+	for k, v := range source.Config {
+		sourceConfig[k] = v
+	}
+	sourceConfig["category"] = source.Category
+	sourceConfig["source"] = source.Name
+
 	// Start periodic fetching
 	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
 
 	// Fetch immediately on start
-	fetchAndPublish(source.Name, handler, source.Config, producer)
+	fetchAndPublish(source.Name, handler, sourceConfig, producer)
 
 	// Then fetch on schedule
 	for range ticker.C {
-		fetchAndPublish(source.Name, handler, source.Config, producer)
+		fetchAndPublish(source.Name, handler, sourceConfig, producer)
 	}
 }
 
@@ -112,8 +120,8 @@ func fetchAndPublish(sourceName string, handler handlers.Handler, config map[str
 
 	// Print the data (for debugging)
 	for _, point := range points {
-		fmt.Printf("📊 %s: %.2f %s at (%.4f, %.4f)\n",
-			point.Variable, point.Value, point.Units, point.Lat, point.Lon)
+		fmt.Printf("📊 %s (%s): %s = %.2f %s at (%.4f, %.4f)\n",
+			point.Source, point.Category, point.Variable, point.Value, point.Units, point.Lat, point.Lon)
 	}
 
 	// Publish to Kafka
@@ -137,7 +145,7 @@ func getKafkaBrokers() []string {
 func getKafkaTopic() string {
 	topic := os.Getenv("KAFKA_TOPIC")
 	if topic == "" {
-		topic = "weather.raw"
+		topic = "data.raw"
 	}
 	return topic
 }

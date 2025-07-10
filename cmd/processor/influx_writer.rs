@@ -50,7 +50,7 @@ impl InfluxWriter {
         let mut write_queries = Vec::new();
 
         for processed_point in &points {
-            let point = &processed_point.climate_point;
+            let point = &processed_point.data_point;
             let enriched = &processed_point.enriched_data;
 
             // Convert epoch milliseconds to DateTime
@@ -58,34 +58,36 @@ impl InfluxWriter {
                 DateTime::from_timestamp_millis(point.epoch_ms).unwrap_or_else(|| Utc::now());
 
             // Create the main data point
-            let write_query = WriteQuery::new(timestamp.into(), "climate_data")
+            let write_query = WriteQuery::new(timestamp.into(), "data_points")
                 .add_tag("source", point.source.as_str())
+                .add_tag("category", point.category.as_str())
                 .add_tag("variable", point.variable.as_str())
                 .add_tag("units", point.units.as_str())
                 .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
                 .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
                 .add_field("value", point.value)
                 .add_field("lat", point.lat)
-                .add_field("lon", point.lon)
-                .add_field("quality_score", processed_point.quality_score);
+                .add_field("lon", point.lon);
 
             write_queries.push(write_query);
 
             // Write calculated fields as separate measurements
             for (field_name, field_value) in &enriched.calculated_fields {
-                let calculated_query = WriteQuery::new(timestamp.into(), "climate_data")
+                let calculated_query = WriteQuery::new(timestamp.into(), "calculated_fields")
                     .add_tag("source", point.source.as_str())
+                    .add_tag("category", point.category.as_str())
                     .add_tag("variable", field_name.as_str())
+                    .add_tag("original_variable", point.variable.as_str())
                     .add_tag(
                         "units",
-                        self.get_units_for_calculated_field(field_name).as_str(),
+                        self.get_units_for_calculated_field(field_name, &point.category)
+                            .as_str(),
                     )
                     .add_tag("country", enriched.country.as_deref().unwrap_or("unknown"))
                     .add_tag("region", enriched.region.as_deref().unwrap_or("unknown"))
                     .add_field("value", *field_value)
                     .add_field("lat", point.lat)
-                    .add_field("lon", point.lon)
-                    .add_field("quality_score", processed_point.quality_score);
+                    .add_field("lon", point.lon);
 
                 write_queries.push(calculated_query);
             }
@@ -108,11 +110,32 @@ impl InfluxWriter {
         Ok(())
     }
 
-    fn get_units_for_calculated_field(&self, field_name: &str) -> String {
-        match field_name {
-            "temperature_fahrenheit" => "fahrenheit".to_string(),
-            "temperature_kelvin" => "kelvin".to_string(),
-            "dew_point" => "celsius".to_string(),
+    fn get_units_for_calculated_field(&self, field_name: &str, category: &str) -> String {
+        match category {
+            "environmental" => match field_name {
+                "temperature_fahrenheit" => "fahrenheit".to_string(),
+                "temperature_kelvin" => "kelvin".to_string(),
+                "dew_point" => "celsius".to_string(),
+                _ => "unknown".to_string(),
+            },
+            "health" => match field_name {
+                "body_temperature_fahrenheit" => "fahrenheit".to_string(),
+                "heart_rate_percentage" => "percentage".to_string(),
+                _ => "unknown".to_string(),
+            },
+            "infrastructure" => match field_name {
+                "flow_rate_m3_per_hour" => "m³/h".to_string(),
+                "pressure_psi" => "psi".to_string(),
+                _ => "unknown".to_string(),
+            },
+            "economic" => match field_name {
+                "price_per_unit" => "currency/unit".to_string(),
+                _ => "unknown".to_string(),
+            },
+            "social" => match field_name {
+                "population_density" => "people/km²".to_string(),
+                _ => "unknown".to_string(),
+            },
             _ => "unknown".to_string(),
         }
     }

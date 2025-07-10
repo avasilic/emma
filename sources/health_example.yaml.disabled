@@ -1,0 +1,35 @@
+name: "health_monitoring_station"
+type: "http_fetch"
+category: "health"
+frequency: "30s"
+config:
+  url: "https://api.health-monitor.example.com/readings"
+  method: "GET"
+  headers:
+    - key: "Authorization"
+      value: "${HEALTH_API_KEY}"
+    - key: "Content-Type"
+      value: "application/json"
+  data_points:
+    - response_path: "$.sensors[*].heart_rate"
+      variable: "heart_rate"
+      units: "bpm"
+      coordinates:
+        lat_path: "$.sensors[*].location.lat"
+        lon_path: "$.sensors[*].location.lon"
+      station_id: "hr_sensor_001"
+    - response_path: "$.sensors[*].body_temperature"
+      variable: "temperature"
+      units: "celsius"
+      coordinates:
+        lat_path: "$.sensors[*].location.lat"
+        lon_path: "$.sensors[*].location.lon"
+      station_id: "temp_sensor_001"
+    - response_path: "$.sensors[*].blood_pressure.systolic"
+      variable: "systolic_pressure"
+      units: "mmHg"
+      coordinates:
+        lat_path: "$.sensors[*].location.lat"
+        lon_path: "$.sensors[*].location.lon"
+      station_id: "bp_sensor_001"
+  source: "health_monitoring_api"

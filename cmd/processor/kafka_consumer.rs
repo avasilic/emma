@@ -8,9 +8,7 @@ use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 use crate::config::KafkaConfig;
-use crate::proto::ClimatePoint;
-
-// Include generated protobuf code
+use crate::proto::DataPoint;
 
 pub struct KafkaConsumer {
     consumer: StreamConsumer,
@@ -34,7 +32,7 @@ impl KafkaConsumer {
         })
     }
 
-    pub async fn stream(&self) -> Result<BoxStream<'_, Result<ClimatePoint>>> {
+    pub async fn stream(&self) -> Result<BoxStream<'_, Result<DataPoint>>> {
         self.consumer
             .subscribe(&[&self.topic])
             .map_err(|e| anyhow!("Failed to subscribe to topic {}: {}", self.topic, e))?;
@@ -55,25 +53,26 @@ impl KafkaConsumer {
         Ok(Box::pin(message_stream))
     }
 
-    fn parse_message(&self, message: BorrowedMessage) -> Result<ClimatePoint> {
+    fn parse_message(&self, message: BorrowedMessage) -> Result<DataPoint> {
         let payload = message
             .payload()
             .ok_or_else(|| anyhow!("Message has no payload"))?;
 
         // Decode as protobuf
-        let climate_point = ClimatePoint::decode(payload)
+        let data_point = DataPoint::decode(payload)
             .map_err(|e| anyhow!("Failed to decode protobuf message: {}", e))?;
 
         info!(
-            "📊 Received: {} = {:.2} {} from {} at ({:.4}, {:.4})",
-            climate_point.variable,
-            climate_point.value,
-            climate_point.units,
-            climate_point.source,
-            climate_point.lat,
-            climate_point.lon
+            "📊 Received: {} ({}) = {:.2} {} from {} at ({:.4}, {:.4})",
+            data_point.variable,
+            data_point.category,
+            data_point.value,
+            data_point.units,
+            data_point.source,
+            data_point.lat,
+            data_point.lon
         );
 
-        Ok(climate_point)
+        Ok(data_point)
     }
 }
