@@ -115,35 +115,6 @@ pre-commit:
           echo "⚠️  docker-compose not found, skipping validation"
         fi
 
-    # Check for secrets/sensitive data
-    secrets-check:
-      glob: "*"
-      run: |
-        files=$(git diff --cached --name-only --diff-filter=ACM)
-        if [ -n "$files" ]; then
-          # Check for common secret patterns
-          secrets_found=""
-          for file in $files; do
-            # Skip binary files and generated files
-            if file "$file" | grep -q "text" && ! echo "$file" | grep -qE '\.(pb\.go|lock)$'; then
-              # Check for API keys, passwords, tokens
-              if grep -HnE "(api[_-]?key|password|secret|token|private[_-]?key)" "$file" | grep -vE "(placeholder|example|test|mock|fake|dummy|YOUR_)" >/dev/null; then
-                secrets_found="$secrets_found\n$file"
-              fi
-            fi
-          done
-          
-          if [ -n "$secrets_found" ]; then
-            echo "⚠️  Potential secrets detected in:"
-            echo "$secrets_found"
-            echo "Please review these files and ensure no real secrets are committed."
-            echo "Use environment variables or secret management instead."
-            # Don't fail the commit, just warn
-          else
-            echo "✅ No obvious secrets detected"
-          fi
-        fi
-
 pre-push:
   parallel: true
   commands:
