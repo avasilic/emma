@@ -125,3 +125,4 @@ influx_dump_*.sql
 
 # Lefthook local configuration
 .lefthook-local.yml
+cmd/processor/allCountries.txt
