@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"os/signal"
 	"strings"
@@ -82,10 +83,8 @@ func startWorker(source config.SourceConfig, producer *kafka.Producer) {
 	}
 
 	// Add category to config for handler
-	sourceConfig := make(map[string]interface{})
-	for k, v := range source.Config {
-		sourceConfig[k] = v
-	}
+	sourceConfig := make(map[string]any)
+	maps.Copy(sourceConfig, source.Config)
 	sourceConfig["category"] = source.Category
 	sourceConfig["source"] = source.Name
 
@@ -102,7 +101,7 @@ func startWorker(source config.SourceConfig, producer *kafka.Producer) {
 	}
 }
 
-func fetchAndPublish(sourceName string, handler handlers.Handler, config map[string]interface{}, producer *kafka.Producer) {
+func fetchAndPublish(sourceName string, handler handlers.Handler, config map[string]any, producer *kafka.Producer) {
 	log.Printf("Fetching data for source: %s", sourceName)
 
 	points, err := handler.Fetch(config)

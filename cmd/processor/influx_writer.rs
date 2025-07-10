@@ -8,6 +8,7 @@ use crate::processor::ProcessedPoint;
 
 pub struct InfluxWriter {
     client: Client,
+    #[allow(dead_code)]
     database: String,
 }
 
@@ -55,7 +56,7 @@ impl InfluxWriter {
 
             // Convert epoch milliseconds to DateTime
             let timestamp =
-                DateTime::from_timestamp_millis(point.epoch_ms).unwrap_or_else(|| Utc::now());
+                DateTime::from_timestamp_millis(point.epoch_ms).unwrap_or_else(Utc::now);
 
             // Create the main data point
             let mut write_query = WriteQuery::new(timestamp.into(), "data_points")
@@ -73,7 +74,7 @@ impl InfluxWriter {
             if let Some(h3_cells) = &enriched.h3_cells {
                 for (resolution, &cell_id) in h3_cells.iter().enumerate() {
                     write_query = write_query
-                        .add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                        .add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                 }
             }
 
@@ -106,7 +107,7 @@ impl InfluxWriter {
                 // Add all H3 cell IDs as fields for efficient spatial queries
                 for (resolution, &cell_id) in h3_cells.iter().enumerate() {
                     h3_query =
-                        h3_query.add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                        h3_query.add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                 }
 
                 if let Some(nearest_place) = &enriched.nearest_place {
@@ -146,7 +147,7 @@ impl InfluxWriter {
                 if let Some(h3_cells) = &enriched.h3_cells {
                     for (resolution, &cell_id) in h3_cells.iter().enumerate() {
                         calculated_query = calculated_query
-                            .add_field(&format!("h3_cell_res_{}", resolution), cell_id as i64);
+                            .add_field(format!("h3_cell_res_{resolution}"), cell_id as i64);
                     }
                 }
 

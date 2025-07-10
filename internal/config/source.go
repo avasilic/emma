@@ -31,11 +31,11 @@ func ValidateCategory(category string) bool {
 }
 
 type SourceConfig struct {
-	Name      string                 `yaml:"name"`
-	Type      string                 `yaml:"type"`
-	Category  string                 `yaml:"category"`
-	Frequency string                 `yaml:"frequency"`
-	Config    map[string]interface{} `yaml:"config"`
+	Name      string         `yaml:"name"`
+	Type      string         `yaml:"type"`
+	Category  string         `yaml:"category"`
+	Frequency string         `yaml:"frequency"`
+	Config    map[string]any `yaml:"config"`
 }
 
 func (s *SourceConfig) GetFrequency() (time.Duration, error) {

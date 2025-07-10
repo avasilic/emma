@@ -25,14 +25,14 @@ func NewHTTPFetcher() *HTTPFetcher {
 	}
 }
 
-func (h *HTTPFetcher) Validate(config map[string]interface{}) error {
+func (h *HTTPFetcher) Validate(config map[string]any) error {
 	if _, ok := config["url"]; !ok {
 		return fmt.Errorf("url is required for http_fetch")
 	}
 	return nil
 }
 
-func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, error) {
+func (h *HTTPFetcher) Fetch(config map[string]any) ([]*v1.DataPoint, error) {
 	url := config["url"].(string)
 	method := h.getStringConfig(config, "method", "GET")
 
@@ -43,9 +43,9 @@ func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, err
 	}
 
 	// Add headers
-	if headers, ok := config["headers"].([]interface{}); ok {
+	if headers, ok := config["headers"].([]any); ok {
 		for _, header := range headers {
-			if h, ok := header.(map[string]interface{}); ok {
+			if h, ok := header.(map[string]any); ok {
 				key := h["key"].(string)
 				value := h["value"].(string)
 
@@ -61,10 +61,10 @@ func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, err
 	}
 
 	// Add query parameters
-	if params, ok := config["params"].([]interface{}); ok {
+	if params, ok := config["params"].([]any); ok {
 		q := req.URL.Query()
 		for _, param := range params {
-			if p, ok := param.(map[string]interface{}); ok {
+			if p, ok := param.(map[string]any); ok {
 				key := p["key"].(string)
 				value := p["value"].(string)
 				q.Add(key, value)
@@ -85,7 +85,7 @@ func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, err
 	}
 
 	// Parse JSON response
-	var jsonData interface{}
+	var jsonData any
 	if err := json.NewDecoder(resp.Body).Decode(&jsonData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
@@ -96,7 +96,7 @@ func (h *HTTPFetcher) Fetch(config map[string]interface{}) ([]*v1.DataPoint, err
 	return h.extractDataPoints(string(jsonBytes), config)
 }
 
-func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]interface{}) ([]*v1.DataPoint, error) {
+func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]any) ([]*v1.DataPoint, error) {
 	var points []*v1.DataPoint
 
 	// Get the configuration
@@ -104,10 +104,10 @@ func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]inter
 	category := h.getStringConfig(config, "category", "environmental")
 
 	// Check if we have multiple data points
-	if dataPoints, ok := config["data_points"].([]interface{}); ok {
+	if dataPoints, ok := config["data_points"].([]any); ok {
 		// Handle multiple data points configuration
 		for _, dp := range dataPoints {
-			if dataPoint, ok := dp.(map[string]interface{}); ok {
+			if dataPoint, ok := dp.(map[string]any); ok {
 				point, err := h.extractSingleDataPoint(jsonData, dataPoint, source, category)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract data point: %w", err)
@@ -131,7 +131,7 @@ func (h *HTTPFetcher) extractDataPoints(jsonData string, config map[string]inter
 	return points, nil
 }
 
-func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]interface{}, source, category string) (*v1.DataPoint, error) {
+func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]any, source, category string) (*v1.DataPoint, error) {
 	// Get the response path
 	responsePath := h.getStringConfig(config, "response_path", "")
 	if responsePath == "" {
@@ -154,7 +154,7 @@ func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]
 	var lat, lon float64
 	var err error
 
-	if coords, ok := config["coordinates"].(map[string]interface{}); ok {
+	if coords, ok := config["coordinates"].(map[string]any); ok {
 		lat, lon, err = h.extractCoordinates(jsonData, coords)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract coordinates: %w", err)
@@ -183,7 +183,7 @@ func (h *HTTPFetcher) extractSingleDataPoint(jsonData string, config map[string]
 	return point, nil
 }
 
-func (h *HTTPFetcher) extractCoordinates(jsonData string, coords map[string]interface{}) (float64, float64, error) {
+func (h *HTTPFetcher) extractCoordinates(jsonData string, coords map[string]any) (float64, float64, error) {
 	var lat, lon float64
 
 	// Try to get latitude
@@ -231,7 +231,7 @@ func (h *HTTPFetcher) generateUUID(source, variable, stationId string) string {
 	return fmt.Sprintf("%s_%s_%d", source, variable, timestamp)
 }
 
-func (h *HTTPFetcher) getStringConfig(config map[string]interface{}, key, defaultValue string) string {
+func (h *HTTPFetcher) getStringConfig(config map[string]any, key, defaultValue string) string {
 	if val, ok := config[key].(string); ok {
 		return val
 	}

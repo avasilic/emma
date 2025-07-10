@@ -110,6 +110,7 @@ impl H3Geocoder {
     }
 
     /// Get just the H3 cell ID for a specific resolution
+    #[allow(dead_code)]
     pub fn get_cell_id(&self, lat: f64, lng: f64, resolution: u8) -> Option<u64> {
         if resolution > 8 {
             return None;
@@ -122,6 +123,7 @@ impl H3Geocoder {
     }
 
     /// Convert H3 cell back to center coordinates
+    #[allow(dead_code)]
     pub fn cell_to_center(&self, cell_id: u64) -> Option<(f64, f64)> {
         if let Ok(cell) = CellIndex::try_from(cell_id) {
             let center: LatLng = cell.into();

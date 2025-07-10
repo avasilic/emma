@@ -5,6 +5,6 @@ import (
 )
 
 type Handler interface {
-	Fetch(config map[string]interface{}) ([]*v1.DataPoint, error)
-	Validate(config map[string]interface{}) error
+	Fetch(config map[string]any) ([]*v1.DataPoint, error)
+	Validate(config map[string]any) error
 }
