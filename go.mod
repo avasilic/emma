@@ -4,8 +4,8 @@ go 1.24
 
 require (
 	github.com/segmentio/kafka-go v0.4.48
-	github.com/tidwall/gjson v1.17.1
-	google.golang.org/protobuf v1.34.2
+	github.com/tidwall/gjson v1.18.0
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
