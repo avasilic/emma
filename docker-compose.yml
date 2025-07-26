@@ -1,7 +1,7 @@
 services:
   # Kafka with KRaft mode (no Zookeeper needed)
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:7.9.2
     container_name: emma-kafka
     ports:
       - "9092:9092"
